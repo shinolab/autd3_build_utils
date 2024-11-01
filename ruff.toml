@@ -1,0 +1,7 @@
+target-version = "py313"
+line-length = 150
+
+[lint]
+ignore = ["D", "S603", "T201"]
+select = ["ALL"]
+fixable = ["ALL"]
