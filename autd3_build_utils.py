@@ -46,8 +46,8 @@ def with_env(**kwargs: str) -> Generator:
 def run_command(command: list[str]) -> None:
     try:
         subprocess.run(command, check=False).check_returncode()
-    except subprocess.CalledProcessError as e:
-        err(f"command failed: {e.cmd}")
+    except subprocess.CalledProcessError:
+        err(f"command failed: {" ".join(command)}")
         sys.exit(-1)
 
 
