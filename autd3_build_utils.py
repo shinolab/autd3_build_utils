@@ -47,7 +47,7 @@ def run_command(command: list[str]) -> None:
     try:
         subprocess.run(command, check=False).check_returncode()
     except subprocess.CalledProcessError:
-        err(f"command failed: {" ".join(command)}")
+        err(f"command failed: {' '.join(command)}")
         sys.exit(-1)
 
 
@@ -68,6 +68,15 @@ def rm_glob_f(pattern: str, *, path: Path | None = None, exclude: str | None = N
         paths -= set(path.rglob(exclude))
     for f in paths:
         f.unlink(missing_ok=True)
+
+
+def rrmdir(path: Path) -> None:
+    for file in path.rglob("*"):
+        if file.is_file():
+            file.unlink()
+        else:
+            rrmdir(file)
+    path.rmdir()
 
 
 class BaseConfig:
