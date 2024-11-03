@@ -67,10 +67,14 @@ def rm_glob_f(pattern: str, *, path: Path | None = None, exclude: str | None = N
     if exclude is not None:
         paths -= set(path.rglob(exclude))
     for f in paths:
-        f.unlink(missing_ok=True)
+        with contextlib.suppress(PermissionError):
+            f.unlink(missing_ok=True)
 
 
 def rrmdir(path: Path) -> None:
+    if not path.exists():
+        return
+
     for file in path.rglob("*"):
         if file.is_file():
             file.unlink()
