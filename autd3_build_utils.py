@@ -61,26 +61,38 @@ def fetch_submodule(*, recursive: bool = False) -> None:
         err("git is not installed. Skip fetching submodules.")
 
 
-def rm_glob_f(pattern: str, *, path: Path | None = None, exclude: str | None = None) -> None:
+def _remove(path: Path) -> None:
+    with contextlib.suppress(PermissionError):
+        if path.is_file():
+            path.unlink(missing_ok=True)
+        elif path.is_dir():
+            for f in path.iterdir():
+                _remove(f)
+            path.rmdir()
+
+
+def rremove(pattern: str, *, path: Path | str | None = None, exclude: str | None = None) -> None:
     path = path or Path.cwd()
-    paths = set(path.rglob(pattern))
-    if exclude is not None:
-        paths -= set(path.rglob(exclude))
-    for f in paths:
-        with contextlib.suppress(PermissionError):
-            f.unlink(missing_ok=True)
+    path = Path(path)
 
-
-def rrmdir(path: Path) -> None:
     if not path.exists():
         return
 
-    for file in path.rglob("*"):
-        if file.is_file():
-            file.unlink()
-        else:
-            rrmdir(file)
-    path.rmdir()
+    if path.is_file():
+        path.unlink(missing_ok=True)
+    elif path.is_dir():
+        paths = set(path.rglob(pattern))
+        if exclude is not None:
+            paths -= set(path.rglob(exclude))
+        for f in paths:
+            _remove(f)
+
+
+def remove(path: Path | str) -> None:
+    path = Path(path)
+    rremove("*", path=path)
+    if path.is_dir():
+        path.rmdir()
 
 
 class BaseConfig:
