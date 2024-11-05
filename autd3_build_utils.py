@@ -1,9 +1,12 @@
 import contextlib
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
+import tarfile
+import urllib.request
 from collections.abc import Generator
 from pathlib import Path
 from typing import Self
@@ -95,14 +98,46 @@ def remove(path: Path | str) -> None:
         path.rmdir()
 
 
+def substitute_in_file(
+    src_file: Path | str,
+    mapping: list[tuple[str, str]],
+    *,
+    target_file: Path | str | None = None,
+    flags: re.RegexFlag = re.NOFLAG,
+) -> None:
+    src_file = Path(src_file)
+    target_file = Path(target_file) if target_file is not None else Path(src_file)
+    content = src_file.read_text(encoding="utf-8")
+    for key, value in mapping:
+        content = re.sub(key, value, content, flags=flags)
+    target_file.write_text(content, encoding="utf-8")
+
+
 class BaseConfig:
     _platform: str
+    arch: str
+    release: bool
 
-    def __init__(self: Self) -> None:
+    def __init__(self: Self, args) -> None:  # noqa: ANN001
         self._platform = platform.system()
         if not self.is_windows() and not self.is_macos() and not self.is_linux():
             err(f'platform "{platform.system()}" is not supported.')
             sys.exit(-1)
+
+        self.release = getattr(args, "release", False) or False
+
+        arch: str = getattr(args, "arch", None)
+        machine = platform.machine().lower()
+        if arch is not None:
+            machine = arch.lower()
+        if machine in ["amd64", "x86_64"]:
+            self.arch = "x64"
+        elif machine in ["arm64", "aarch64"]:
+            self.arch = "aarch64"
+        elif machine in ["arm32", "armv7l"]:
+            self.arch = "armv7l"
+        else:
+            err(f"Unsupported platform: {machine}")
 
     def is_windows(self: Self) -> bool:
         return self._platform == "Windows"
@@ -124,3 +159,63 @@ class BaseConfig:
         packet_exists = Path("C:\\Windows\\System32\\Packet.dll").is_file() and Path("C:\\Windows\\System32\\Npcap\\Packet.dll").is_file()
 
         return wpcap_exists and packet_exists
+
+    def download_and_extract(  # noqa: C901, PLR0912
+        self: Self,
+        repo: str,
+        name: str,
+        version: str,
+        dest_dirs: list[str],
+        *,
+        ty: str = "shared",
+    ) -> None:
+        url: str
+        base_url = f"https://github.com/shinolab/{repo}/releases/download/v{version}/{name}-v{version}"
+        if self.is_windows():
+            match self.arch:
+                case "x64":
+                    url = f"{base_url}-win-x64-{ty}.zip"
+                case "aarch64":
+                    url = f"{base_url}-win-aarch64-{ty}.zip"
+                case _:
+                    err(f"Unsupported platform: {platform.machine()}")
+        elif self.is_macos():
+            url = f"{base_url}-macos-aarch64-{ty}.tar.gz"
+        elif self.is_linux():
+            match self.arch:
+                case "x64":
+                    url = f"{base_url}-linux-x64-{ty}.tar.gz"
+                case "aarch64":
+                    url = f"{base_url}-linux-armv7-{ty}.tar.gz"
+                case "armv7l":
+                    url = f"{base_url}-linux-aarch64-{ty}.tar.gz"
+
+        tmp_file = Path("tmp.zip" if url.endswith(".zip") else "tmp.tar.gz")
+        urllib.request.urlretrieve(url, tmp_file)
+        if tmp_file.suffix == ".zip":
+            shutil.unpack_archive(tmp_file, ".")
+        else:
+            with tarfile.open(tmp_file, "r:gz") as tar:
+                tar.extractall(filter="fully_trusted")
+        tmp_file.unlink()
+
+        for dest_dir in dest_dirs:
+            Path(dest_dir).mkdir(parents=True, exist_ok=True)
+
+        for dll in Path("bin").glob("*.dll"):
+            for dest_dir in dest_dirs:
+                shutil.copy(dll, dest_dir)
+        for dylib in Path("bin").glob("*.dylib"):
+            for dest_dir in dest_dirs:
+                shutil.copy(dylib, dest_dir)
+        for so in Path("bin").glob("*.so"):
+            for dest_dir in dest_dirs:
+                shutil.copy(so, dest_dir)
+        for lib in Path("lib").glob("*.lib"):
+            for dest_dir in dest_dirs:
+                shutil.copy(lib, dest_dir)
+        for a in Path("lib").glob("*.a"):
+            for dest_dir in dest_dirs:
+                shutil.copy(a, dest_dir)
+        remove("bin")
+        remove("lib")
