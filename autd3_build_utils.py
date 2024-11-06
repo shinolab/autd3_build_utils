@@ -46,9 +46,9 @@ def with_env(**kwargs: str) -> Generator:
         os.environ.update(env)
 
 
-def run_command(command: list[str]) -> None:
+def run_command(command: list[str], *, shell: bool = False) -> None:
     try:
-        subprocess.run(command, check=False).check_returncode()
+        subprocess.run(command, check=False, shell=shell).check_returncode()
     except subprocess.CalledProcessError:
         err(f"command failed: {' '.join(command)}")
         sys.exit(-1)
