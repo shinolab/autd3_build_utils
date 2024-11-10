@@ -130,7 +130,7 @@ class BaseConfig:
         machine = platform.machine().lower()
         if arch is not None:
             machine = arch.lower()
-        if machine in ["amd64", "x86_64"]:
+        if machine in ["amd64", "x86_64", "x64"]:
             self.arch = "x64"
         elif machine in ["arm64", "aarch64"]:
             self.arch = "aarch64"
