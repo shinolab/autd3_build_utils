@@ -170,7 +170,7 @@ class PyiGenerator(ast.NodeVisitor):
                     (
                         "with_timeout",
                         [
-                            ("timeout", "timedelta | None"),
+                            ("timeout", "Duration | None"),
                         ],
                         [],
                         f"DatagramWithTimeout[{full_class_name}]",
