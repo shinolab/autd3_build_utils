@@ -164,7 +164,7 @@ class PyiGenerator(ast.NodeVisitor):
             self.should_generate = True
 
             if class_name != "DatagramWithTimeout":
-                self.imports.append("from datetime import timedelta")
+                self.imports.append("from pyautd3.utils import Duration")
                 self.imports.append("from pyautd3.driver.datagram.with_timeout import DatagramWithTimeout")
                 methods.append(
                     (
