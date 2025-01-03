@@ -58,7 +58,7 @@ class PyiGenerator(ast.NodeVisitor):
                     async_methods.append((method_name, args, defaults, return_type))
                 case ast.FunctionDef(
                     name=method_name,
-                    args=ast.arguments(args=args, defaults=defaults),
+                    args=ast.arguments(posonlyargs=posonlyargs, args=args, defaults=defaults),
                     returns=returns,
                     decorator_list=decorators,
                 ):
@@ -75,9 +75,10 @@ class PyiGenerator(ast.NodeVisitor):
                         classmethods.append((method_name, args, return_type))
                     else:
                         return_type = self._get_type_annotation(returns)
+                        posonlyargs = [(arg.arg, self._get_type_annotation(arg.annotation)) for arg in posonlyargs[1:]]
                         args = [(arg.arg, self._get_type_annotation(arg.annotation)) for arg in args[1:]]
                         defaults = [self._get_value_expr(d) for d in defaults]
-                        methods.append((method_name, args, defaults, return_type))
+                        methods.append((method_name, posonlyargs, args, defaults, return_type))
 
         if any(d.id == "builder" for d in node.decorator_list if isinstance(d, ast.Name)):
             self.should_generate = True
@@ -100,6 +101,7 @@ class PyiGenerator(ast.NodeVisitor):
                     methods.append(
                         (
                             f"with_{prop_name}",
+                            [],
                             [(prop_name, field_type)],
                             [],
                             full_class_name,
@@ -119,6 +121,7 @@ class PyiGenerator(ast.NodeVisitor):
                         "with_cache",
                         [],
                         [],
+                        [],
                         f"Cache[{full_class_name}]",
                     ),
                 )
@@ -133,6 +136,7 @@ class PyiGenerator(ast.NodeVisitor):
                         "with_cache",
                         [],
                         [],
+                        [],
                         f"Cache[{full_class_name}]",
                     ),
                 )
@@ -142,6 +146,7 @@ class PyiGenerator(ast.NodeVisitor):
                 methods.append(
                     (
                         "with_fir",
+                        [],
                         [
                             ("iterable", "Iterable[float]"),
                         ],
@@ -154,6 +159,7 @@ class PyiGenerator(ast.NodeVisitor):
                 methods.append(
                     (
                         "with_radiation_pressure",
+                        [],
                         [],
                         [],
                         f"RadiationPressure[{full_class_name}]",
@@ -169,6 +175,7 @@ class PyiGenerator(ast.NodeVisitor):
                 methods.append(
                     (
                         "with_timeout",
+                        [],
                         [
                             ("timeout", "Duration | None"),
                         ],
@@ -181,6 +188,7 @@ class PyiGenerator(ast.NodeVisitor):
                 methods.append(
                     (
                         "with_parallel_threshold",
+                        [],
                         [
                             ("threshold", "int | None"),
                         ],
@@ -196,6 +204,7 @@ class PyiGenerator(ast.NodeVisitor):
             methods.append(
                 (
                     "with_segment",
+                    [],
                     [
                         ("segment", "Segment"),
                         ("transition_mode", "TransitionModeWrap | None"),
@@ -261,11 +270,14 @@ class PyiGenerator(ast.NodeVisitor):
                     [f"{name}: {ty}" + (f" = {default}" if default != "None" else "") for (name, ty), default in zip(args, defaults, strict=True)],
                 )
                 lines.append(f"    async def {method_name}(self: {full_class_name}, {args_str}) -> {return_type}: ...")
-            for method_name, args, defaults, return_type in methods:
+            for method_name, posonlyargs, args, defaults, return_type in methods:
                 defaults = ["None"] * (len(args) - len(defaults)) + defaults  # noqa: PLW2901
+                posonlyargs_str = ", ".join([f"{name}: {ty}" for name, ty in posonlyargs])
                 args_str = ", ".join(
                     [f"{name}: {ty}" + (f" = {default}" if default != "None" else "") for (name, ty), default in zip(args, defaults, strict=True)],
                 )
+                if posonlyargs_str:
+                    args_str = posonlyargs_str + ", /, " + args_str
                 if method_name == "__new__":
                     lines.append(f"    def {method_name}(cls, {args_str}) -> {return_type}: ...")
                 elif method_name == "__init__" and class_name == "FociSTM":
