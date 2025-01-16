@@ -199,7 +199,8 @@ class PyiGenerator(ast.NodeVisitor):
         if any(d.id == "datagram_with_segment" for d in node.decorator_list if isinstance(d, ast.Name)):
             self.should_generate = True
 
-            self.imports.append("from pyautd3.native_methods.autd3capi_driver import Segment, TransitionModeWrap")
+            self.imports.append("from pyautd3.native_methods.autd3capi_driver import TransitionModeWrap")
+            self.imports.append("from pyautd3.native_methods.autd3_core import Segment")
             self.imports.append("from pyautd3.driver.datagram.with_segment import DatagramWithSegment")
             methods.append(
                 (
